@@ -7,6 +7,7 @@ WORKDIR /src
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     git \
+    python3 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN git clone https://github.com/jamiepine/voicebox.git /src/voicebox && \
@@ -15,9 +16,28 @@ RUN git clone https://github.com/jamiepine/voicebox.git /src/voicebox && \
 
 WORKDIR /src/voicebox
 
-RUN sed -i "s|'http://localhost:17493'|window.location.origin|g" web/src/platform/lifecycle.ts && \
-    sed -i "s|'http://127.0.0.1:17493'|typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:17493'|g" app/src/stores/serverStore.ts && \
-    sed -i '/"tauri"/d; /"landing"/d' package.json && \
+RUN set -eux; \
+    sed -i "s|'http://localhost:17493'|window.location.origin|g" web/src/platform/lifecycle.ts; \
+    python3 - <<'PY'
+from pathlib import Path
+
+path = Path("/src/voicebox/app/src/stores/serverStore.ts")
+text = path.read_text()
+text = text.replace(
+    "export const useServerStore = create<ServerStore>()(",
+    """function getBrowserServerUrl(): string {\n  if (typeof window === 'undefined' || !window.location.origin) {\n    return 'http://127.0.0.1:17493';\n  }\n  return window.location.origin;\n}\n\nfunction normalizeServerUrl(url: unknown): string {\n  if (typeof url !== 'string' || !url) {\n    return getBrowserServerUrl();\n  }\n  if (url === 'http://127.0.0.1:17493' || url === 'http://localhost:17493') {\n    return getBrowserServerUrl();\n  }\n  return url;\n}\n\nexport const useServerStore = create<ServerStore>()(""",
+)
+text = text.replace(
+    "      serverUrl: 'http://127.0.0.1:17493',",
+    "      serverUrl: getBrowserServerUrl(),",
+)
+text = text.replace(
+    "    {\\n      name: 'voicebox-server',\\n    },",
+    """    {\n      name: 'voicebox-server',\n      merge: (persistedState, currentState) => {\n        const persisted = (persistedState as Partial<ServerStore> | undefined) ?? {};\n        return {\n          ...currentState,\n          ...persisted,\n          serverUrl: normalizeServerUrl(persisted.serverUrl),\n        };\n      },\n    },""",
+)
+path.write_text(text)
+PY
+RUN sed -i '/"tauri"/d; /"landing"/d' package.json && \
     sed -i -z 's/,\n  ]/\n  ]/' package.json && \
     bun install --no-save && \
     cd web && bunx --bun vite build
