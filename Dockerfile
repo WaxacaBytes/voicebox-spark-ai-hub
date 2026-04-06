@@ -15,7 +15,9 @@ RUN git clone https://github.com/jamiepine/voicebox.git /src/voicebox && \
 
 WORKDIR /src/voicebox
 
-RUN sed -i '/"tauri"/d; /"landing"/d' package.json && \
+RUN sed -i "s|'http://localhost:17493'|window.location.origin|g" web/src/platform/lifecycle.ts && \
+    sed -i "s|'http://127.0.0.1:17493'|typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:17493'|g" app/src/stores/serverStore.ts && \
+    sed -i '/"tauri"/d; /"landing"/d' package.json && \
     sed -i -z 's/,\n  ]/\n  ]/' package.json && \
     bun install --no-save && \
     cd web && bunx --bun vite build
