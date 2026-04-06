@@ -1,7 +1,7 @@
-# Voicebox SparkDeck Wrapper
+# Voicebox Spark AI Hub Wrapper
 
-SparkDeck wrapper for [Voicebox](https://voicebox.sh/).
+Spark AI Hub wrapper for [Voicebox](https://voicebox.sh/).
 
 This image packages the official Voicebox web app so it can run locally inside
-SparkDeck with persistent data and model directories.
+Spark AI Hub with persistent data and model directories.
 
